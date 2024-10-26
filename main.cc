@@ -158,14 +158,14 @@ Board Decompress(CompressedBoard b) {
 }
 
 struct Move {
-  int color;
-  int size; // 0 - biggest
+  int8_t color;
+  int8_t size; // 0 - biggest
   // Current location of the piece. If -1 this is a new piece
-  int from_i;
-  int from_j;
+  int8_t from_i;
+  int8_t from_j;
   // New location of the piece.
-  int to_i;
-  int to_j;
+  int8_t to_i;
+  int8_t to_j;
 };
 
 // returns the biggest size of a piece in the given position. 0 is the biggest. -1 if no piece is placed.
@@ -470,15 +470,15 @@ void test_winning() {
   std::cout << "Black winner? " << winner(e, B) << "\n";
 }
 
-std::vector<Move> next_moves_with_piece(const int positions[3][3], int color, int size, int from_i, int from_j) {
+std::vector<Move> next_moves_with_piece(const int positions[3][3], int8_t color, int8_t size, int8_t from_i, int8_t from_j) {
   #ifdef DEBUG
   std::cout << "next_moves_with_piece(color = " << color << ", size = " << size << ", from: " << from_i << ", " << from_j << ")"; 
   #endif
   std::vector<Move> out;
-  for (int i = 0; i < 3; i++) {
-    for (int j = 0; j < 3; j++) {
+  for (int8_t i = 0; i < 3; i++) {
+    for (int8_t j = 0; j < 3; j++) {
       if (i == from_i && j == from_j) continue;
-      int biggest = biggest_size(positions[i][j]);
+      int8_t biggest = biggest_size(positions[i][j]);
       if (biggest == -1 || biggest > size) {
 	Move m = {.size = size, .color = color, .from_i = from_i, .from_j = from_j, .to_i = i, .to_j = j};
 	out.push_back(m);
@@ -706,7 +706,7 @@ void min_max() {
   analyze(init_board());
 }
 
-void move(Board& b, int color, int size, int i, int j, int from_i = -1, int from_j = -1) {
+void move(Board& b, int8_t color, int8_t size, int8_t i, int8_t j, int8_t from_i = -1, int8_t from_j = -1) {
   Move m = {.from_i = from_i, .from_j = from_j, .to_i = i, .to_j = j, .size = size, .color = color};
   Board out;
   bool status = apply_move(b, m, out);
