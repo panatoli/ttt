@@ -9,8 +9,8 @@
 #define B 0x2
 #define D 0x3
 
-#define MOVES_TO_DRAW 32
-#define LIMIT_TOTAL_MOVES
+//#define MOVES_TO_DRAW 32
+//#define LIMIT_TOTAL_MOVES
 //#define DEBUG 
 
 struct Board {
@@ -588,6 +588,8 @@ struct Metadata {
 static std::unordered_map<int64_t, Metadata> tree = {};
 
 void analyze(const Board& b) {
+  if (tree.size() % (1<<15) == 0)
+    std::cout << "tree.size() = " << tree.size() << "\n";
   int8_t other = 3 - b.move;
   int64_t compressed = Compress(b);
   int e[3][3];
