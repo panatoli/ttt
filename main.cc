@@ -13,8 +13,8 @@
 //#define MOVES_TO_DRAW 32
 //#define LIMIT_TOTAL_MOVES
 
-#define PRINT_TREE_SIZE_RESOLUTION 16
-#define TREE_SIZE_LIMIT 10000
+#define PRINT_TREE_SIZE_RESOLUTION 4
+#define TREE_SIZE_LIMIT 1000
 
 //#define DEBUG
 
@@ -631,6 +631,7 @@ void play_known_endings() {
 void analyze(const Board& b) {
   if (tree.size() % (1<<PRINT_TREE_SIZE_RESOLUTION) == 0) {
     std::cout << "tree.size() = " << tree.size() << "\n";
+    std::cout << "visited.size() = " << visited.size() << "\n";
     #ifdef TREE_SIZE_LIMIT
     if (tree.size() >= TREE_SIZE_LIMIT) {
       play_known_endings();
@@ -709,7 +710,7 @@ void analyze(const Board& b) {
 	moves_to_best = n_md.moves_to_outcome + 1;
 	best_move = m;
 	best_outcome = b.move;
-	if (moves_to_best == 1) {
+	if (moves_to_best/* == 1*/) {
 	  // We're not going to find a better move.
 	  break;
 	}
