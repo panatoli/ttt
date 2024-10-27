@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <map>
+#include <stack>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -13,8 +14,9 @@
 //#define MOVES_TO_DRAW 32
 //#define LIMIT_TOTAL_MOVES
 
-#define PRINT_TREE_SIZE_RESOLUTION 4
+#define PRINT_TREE_SIZE_RESOLUTION 0
 #define TREE_SIZE_LIMIT 1000
+#define STACK_SIZE_LIMIT 30
 
 //#define DEBUG
 
@@ -105,7 +107,6 @@ CompressedBoard Compress(const Board& b) {
   return out;
 }
 
-// This on is for tests only. Decompression is never used in the search code.
 Board Decompress(CompressedBoard b) {
   std::map<int, std::vector<std::pair<int, int>>> white_locations;
   std::map<int, std::vector<std::pair<int, int>>> black_locations;
@@ -478,7 +479,7 @@ void test_winning() {
 
 std::vector<Move> next_moves_with_piece(const int positions[3][3], int8_t color, int8_t size, int8_t from_i, int8_t from_j) {
   #ifdef DEBUG
-  std::cout << "next_moves_with_piece(color = " << color << ", size = " << size << ", from: " << from_i << ", " << from_j << ")"; 
+  std::cout << "next_moves_with_piece(color = " << static_cast<int>(color) << ", size = " << static_cast<int>(size) << ", from: " << static_cast<int>(from_i) << ", " << static_cast<int>(from_j) << ")"; 
   #endif
   std::vector<Move> out;
   for (int8_t i = 0; i < 3; i++) {
@@ -518,8 +519,7 @@ void set_positions(Board& b, int p[3][3]) {
 std::vector<Move> next_moves_with_existing_pieces(const Board& b) {
   std::vector<Move> out;
   #ifdef DEBUG
-  std::cout << "Next move with existing pieces:\n";
-  print_board(b);
+  std::cout << "Next move with existing pieces()\n";
   #endif
   for (int i = 0; i < 3; i++) {
     for (int j = 0; j < 3; j++) {
@@ -531,16 +531,16 @@ std::vector<Move> next_moves_with_existing_pieces(const Board& b) {
 	effective_positions(dummy.positions, e);
 	// Check if the opponent is winning during the move
 	#ifdef DEBUG
-	std::cout << "Checking for opponent win en passant, dummy board:\n";
+	//std::cout << "Checking for opponent win en passant, dummy board:\n";
 	//print_board(dummy);
-	Board effective = dummy;
-	set_positions(effective, e);
-	std::cout << "Effective board:\n";
+	//Board effective = dummy;
+	//set_positions(effective, e);
+	//std::cout << "Effective board:\n";
 	//print_board(effective);
 	#endif
 	if (winner(e, b.move == W ? B : W)) continue;
 	#ifdef DEBUG
-	std::cout << "No win en passant, continue to next_moves_with_piece\n";
+	//std::cout << "No win en passant, continue to next_moves_with_piece\n";
 	#endif
 	std::vector<Move> v = next_moves_with_piece(dummy.positions, b.move, k, i, j);
 	out.insert(out.end(), v.begin(), v.end());
@@ -556,12 +556,11 @@ std::vector<Move> next_moves(const Board& b) {
   print_board(b);
   #endif
   std::vector<Move> out = next_moves_with_new_pieces(b);
-  #ifdef DEBUG
-  std::cout << "next_moves():\n";
-  print_board(b);
-  #endif
   std::vector<Move> v = next_moves_with_existing_pieces(b);
   out.insert(out.end(), v.begin(), v.end());
+  #ifdef DEBUG
+  std::cout << "next_moves() returns " << out.size() << " moves\n";
+  #endif
   return out;
 }
 
@@ -587,7 +586,7 @@ struct Metadata {
   Move best_move = {0};
   // W / B / D / 0 (unknown)
   int8_t outcome = 0;
-  int16_t moves_to_outcome = -1;
+  int32_t moves_to_outcome = -1;
 };
 
 static std::unordered_map<int64_t, Metadata> tree = {};
@@ -628,7 +627,158 @@ void play_known_endings() {
   }
 }
 
-void analyze(const Board& b) {
+// Returns the winner of the board as is, -1 if no winner
+int8_t winner(Board& b) {
+  int e[3][3];
+  effective_positions(b.positions, e);
+  if (winner(e, W)) {
+    return W;
+  }
+  if (winner(e, B)) {
+    return B;
+  }
+  return -1;
+}
+
+void unravel_stack(std::stack<int64_t>& s) {
+  std::cout << "\n\n\n\n\n 		UNRAVELING STACK  \n\n\n\n";
+  while(!s.empty()) {
+    int64_t b_key = s.top();
+    Board b = Decompress(b_key);
+    s.pop();
+    print_board(b);
+  }
+}
+
+void analyze(const Board& in) {
+  std::stack<int64_t> s;
+  s.push(Compress(in));
+  visited.insert(Compress(in));
+  while (!s.empty()) {
+    if (tree.size() % (1<<PRINT_TREE_SIZE_RESOLUTION) == 0) {
+      std::cout << "tree.size() = " << tree.size() << "\n";
+      std::cout << "stack.size() = " << s.size() << "\n";
+      std::cout << "visited.size() = " << visited.size() << "\n";
+      #ifdef TREE_SIZE_LIMIT
+      if (tree.size() >= TREE_SIZE_LIMIT) {
+        play_known_endings();
+	abort();
+      }
+      if (s.size() >= STACK_SIZE_LIMIT) {
+	unravel_stack(s);
+	abort();
+      }
+      #endif
+    }
+
+    int64_t b_key = s.top();
+    Board b = Decompress(b_key);
+    int8_t other = 3 - b.move;
+    if (tree.contains(b_key)) {
+      std::cout << "Did not expect this key in the tree.";
+      abort();
+    }
+    int8_t w = winner(b);
+    if (w > -1) {
+      tree[b_key] = {.outcome = w, .moves_to_outcome = 0};
+      s.pop();
+      visited.erase(b_key);
+      #ifdef DEBUG
+      std::cout << "Found terminal board:\n";
+      print_board(b);
+      #endif
+      continue;
+    }
+ 
+    auto next = next_moves(b);
+    bool pushed = false;
+    for (const Move& m: next) {
+      Board new_b;
+      apply_move(b, m, new_b);
+      int64_t new_b_key = Compress(new_b);
+      if (!tree.contains(new_b_key)) {
+	s.push(new_b_key);
+	visited.insert(new_b_key);
+	pushed = true;
+	break;
+      }
+    }
+    if (pushed) {
+      // We'll get back to current board b after all children are analyzed.
+      continue;
+    }
+    // Nothing pushed we can compute the next best move.
+    
+    #ifdef DEBUG
+    std::cout << "Looking for best move amongs " << next.size() << " possible moves\n";
+    #endif
+    Move best_move;
+    int32_t moves_to_best = -1;
+    int8_t best_outcome = other;
+    for (const Move& m: next) {
+      Board new_b;
+      apply_move(b, m, new_b);
+      int64_t new_b_key = Compress(new_b);
+      if (!tree.contains(new_b_key)) {
+	std::cout << "Key missing in tree when expected - aborting";
+	abort();
+      }
+      Metadata n_md = tree[new_b_key];
+      if (n_md.outcome == b.move) {
+        // Found a winning move
+	#ifdef DEBUG
+        std::cout << "Found a winning move\n";
+        #endif
+        if (best_outcome != b.move || moves_to_best > n_md.moves_to_outcome) {
+	  moves_to_best = n_md.moves_to_outcome + 1;
+	  best_move = m;
+	  best_outcome = b.move;
+	  if (moves_to_best == 1) {
+	    // We're not going to find a better move.
+	    break;
+	  }
+	}
+	continue;
+      }
+      if (best_outcome == b.move) {
+	// We can't improve what we have.
+	continue;
+      }
+      if (visited.contains(new_b_key)) {
+	#ifdef DEBUG
+        std::cout << "Found a draw by repetition\n";
+        #endif
+        moves_to_best = 1;
+        best_move = m;
+	best_outcome = D;
+      } else if (n_md.outcome == D && (moves_to_best == -1 || moves_to_best > n_md.moves_to_outcome)) {
+	#ifdef DEBUG
+        std::cout << "Found a draw\n";
+        #endif
+	moves_to_best = n_md.moves_to_outcome + 1;
+	best_move = m;
+	best_outcome = D;
+      }
+      if (best_outcome == D) {
+	// We can't improve.
+	continue;
+      }
+
+      #ifdef DEBUG
+      std::cout << "Found a losing move\n";
+      #endif
+      if (n_md.moves_to_outcome >= moves_to_best) {
+        moves_to_best = n_md.moves_to_outcome + 1;
+	best_move = m;
+      }
+    }
+    tree[b_key] = {.best_move = best_move, .outcome = best_outcome, .moves_to_outcome = moves_to_best};
+    s.pop();
+    visited.erase(b_key);
+  }
+}
+
+void analyze_recursive(const Board& b) {
   if (tree.size() % (1<<PRINT_TREE_SIZE_RESOLUTION) == 0) {
     std::cout << "tree.size() = " << tree.size() << "\n";
     std::cout << "visited.size() = " << visited.size() << "\n";
@@ -724,7 +874,7 @@ void analyze(const Board& b) {
 	best_move = m;
 	best_outcome = D;
       }
-    } else if (!n_md.outcome) {
+    } else if (visited.contains(n_c)) {
       #ifdef DEBUG
       std::cout << "Found a visited board\n";
       #endif
