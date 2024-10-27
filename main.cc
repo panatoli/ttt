@@ -2,6 +2,7 @@
 #include <vector>
 #include <map>
 #include <unordered_map>
+#include <unordered_set>
 
 // clang++ -std=c++20 main.cc -o bin && ./bin -v
 
@@ -11,16 +12,21 @@
 
 //#define MOVES_TO_DRAW 32
 //#define LIMIT_TOTAL_MOVES
-//#define DEBUG 
+
+#define PRINT_TREE_SIZE_RESOLUTION 16
+#define TREE_SIZE_LIMIT 10000
+
+//#define DEBUG
+
 
 struct Board {
-  int positions[3][3];
-  int8_t move; // Whose move is that, W/B
+  int positions[3][3] = {0};
+  int8_t move = 0; // Whose move is that, W/B
   // counts of available (unplayed yet) pieces, big to small
-  int white_pieces[3];
-  int black_pieces[3];
+  int white_pieces[3] = {0};
+  int black_pieces[3] = {0};
   #ifdef LIMIT_TOTAL_MOVES
-  int moves_so_far;
+  int moves_so_far = 0;
   #endif
 };
 
@@ -108,9 +114,9 @@ Board Decompress(CompressedBoard b) {
   
   #ifdef LIMIT_TOTAL_MOVES
   out.moves_so_far = b % 256;
+  b = b / 256;
   #endif
 
-  b = b / 256;
   out.move = b % 4;
   b = b / 4;
 
@@ -158,8 +164,8 @@ Board Decompress(CompressedBoard b) {
 }
 
 struct Move {
-  int8_t color;
-  int8_t size; // 0 - biggest
+  int8_t color = 0;
+  int8_t size = -1; // 0 - biggest
   // Current location of the piece. If -1 this is a new piece
   int8_t from_i;
   int8_t from_j;
@@ -582,14 +588,56 @@ struct Metadata {
   // W / B / D / 0 (unknown)
   int8_t outcome = 0;
   int16_t moves_to_outcome = -1;
-  bool visited = false;
 };
 
 static std::unordered_map<int64_t, Metadata> tree = {};
+static std::unordered_set<int64_t> visited = {};
+
+
+
+void play(const Board& in) {
+  Board b = in;
+  std::cout << "\n\n\n\n\n\n\n\n\n\n\n LET THE GAME BEGIN!! \n\n\n\n\n\n\n";
+  int8_t other = 3 - b.move;
+  while (1) {
+    print_board(b);
+    int64_t c = Compress(b);
+    if (!tree.contains(c)) {
+      std::cout << "Missing expected state in tree: " << c << "\n";
+      print_board(b);
+      std::cout << "Recompressed: " << Compress(b) << "\n";
+      abort();
+    }
+    Metadata md = tree[c];
+    Board b2;
+
+    std::cout << "Winning: " << static_cast<int>(md.outcome) << ", in " << static_cast<int>(md.moves_to_outcome) << " moves\n";
+    if (md.moves_to_outcome > 0) {
+      apply_move(b, md.best_move, b2);
+      b = b2;
+    } else {
+      std::cout << "\n\n   THE END \n\n";
+      break;
+    }
+  }
+}
+
+void play_known_endings() {
+  for (auto const& [compressed, metadata] : tree) {
+    play(Decompress(compressed));
+  }
+}
 
 void analyze(const Board& b) {
-  if (tree.size() % (1<<15) == 0)
+  if (tree.size() % (1<<PRINT_TREE_SIZE_RESOLUTION) == 0) {
     std::cout << "tree.size() = " << tree.size() << "\n";
+    #ifdef TREE_SIZE_LIMIT
+    if (tree.size() >= TREE_SIZE_LIMIT) {
+      play_known_endings();
+      abort();
+    }
+    #endif
+  }
   int8_t other = 3 - b.move;
   int64_t compressed = Compress(b);
   int e[3][3];
@@ -608,23 +656,24 @@ void analyze(const Board& b) {
   std::cout << "Winner other ? " << winner(e, other) << "\n";
   std::cout << "tree.size() = " << tree.size() << "\n";
   #endif
-  tree[compressed] = {.visited = true};
   #ifdef DEBUG
   std::cout << "tree.size() = " << tree.size() << "\n";
   #endif
   if (winner(e, other)) {
-    tree[compressed] = {.outcome = other, .moves_to_outcome = 0, .visited = false};
+    tree[compressed] = {.outcome = other, .moves_to_outcome = 0};
     return;
   } else if (winner(e, b.move)) {
-    tree[compressed] = {.outcome = b.move, .moves_to_outcome = 0, .visited = false};
+    tree[compressed] = {.outcome = b.move, .moves_to_outcome = 0};
     return;
-
-  #ifdef LIMIT_TOTAL_MOVES
-  } else if (b.moves_so_far == MOVES_TO_DRAW) {
-    tree[compressed] = {.outcome = D, .moves_to_outcome = 0, .visited = false};
-    return;
-  #endif
   }
+  #ifdef LIMIT_TOTAL_MOVES
+  else if (b.moves_so_far == MOVES_TO_DRAW) {
+    tree[compressed] = {.outcome = D, .moves_to_outcome = 0};
+    return;
+  }
+  #endif
+  
+  visited.insert(compressed);
   
   #ifdef DEBUG
   std::cout << "No winner here.\n";
@@ -646,7 +695,7 @@ void analyze(const Board& b) {
     Metadata n_md = tree[n_c];
     // Should either have an outcome or be visited
     #ifdef DEBUG
-    if (!n_md.outcome and !n_md.visited) {
+    if (!n_md.outcome and !visited.contains(n_c)) {
       std::cout << "Unexpected tree state:";
       abort();
     } 
@@ -691,7 +740,8 @@ void analyze(const Board& b) {
       }
     }
   }
-  tree[compressed] = {.best_move = best_move, .outcome = best_outcome, .moves_to_outcome = moves_to_best, .visited = false};
+  tree[compressed] = {.best_move = best_move, .outcome = best_outcome, .moves_to_outcome = moves_to_best};
+  visited.erase(compressed);
   #ifdef DEBUG
   print_board(b);
   std::cout << "Best move:\n";
@@ -700,10 +750,6 @@ void analyze(const Board& b) {
   std::cout << "Winner: " << static_cast<int>(best_outcome) << "\n";
   std::cout << "\n\n\n";
   #endif
-}
-
-void min_max() {
-  analyze(init_board());
 }
 
 void move(Board& b, int8_t color, int8_t size, int8_t i, int8_t j, int8_t from_i = -1, int8_t from_j = -1) {
@@ -718,30 +764,11 @@ void move(Board& b, int8_t color, int8_t size, int8_t i, int8_t j, int8_t from_i
   b = out;
 }
 
-void play(const Board& in) {
-  Board b = in;
-  std::cout << "\n\n\n\n\n\n\n\n\n\n\n LET THE GAME BEGIN!! \n\n\n\n\n\n\n";
-  int8_t other = 3 - b.move;
-  while (1) {
-    print_board(b);
-    int64_t c = Compress(b);
-    if (!tree.contains(c)) {
-      std::cout << "Missing expected state in tree\n";
-      abort();
-    }
-    Metadata md = tree[c];
-    Board b2;
-
-    std::cout << "Winning: " << static_cast<int>(md.outcome) << ", in " << static_cast<int>(md.moves_to_outcome) << " moves\n";
-    if (md.moves_to_outcome > 0) {
-      apply_move(b, md.best_move, b2);
-      b = b2;
-    } else {
-      std::cout << "\n\n   THE END \n\n";
-      break;
-    }
-  }
+void min_max() {
+  analyze(init_board());
+  play_known_endings();
 }
+
 
 void from_position() {
   Board b = init_board();
@@ -764,7 +791,7 @@ void from_position() {
 }
 
 int main() {
-  //min_max();
-  from_position();
+  min_max();
+  //from_position();
   return 0;
 }
