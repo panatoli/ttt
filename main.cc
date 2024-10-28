@@ -703,19 +703,32 @@ void analyze(const Board& in) {
       continue;
     }
  
-    // First pass
-    int64_t board_to_push = -1;
-    bool found_winner = false;
+    // First pass - look for win in 1.
     auto next = next_moves(b);
+    bool found_winner = false;
     for (const Move& m: next) {
       Board new_b;
       apply_move(b, m, new_b);
       int64_t new_b_key = Compress(new_b);
-      // Check for win in 1 while we're here.
       if (winner(new_b) == b.move) {
+	// Win in 1
 	tree[new_b_key] = {.outcome = b.move, .moves_to_outcome = 0};
+	tree[b_key] = {.best_move = m, .outcome = b.move, .moves_to_outcome = 1};
+        s.pop();
+        visited.erase(b_key);
+	found_winner = true;
+	break;
       }
+    }
+    if (found_winner)
+      continue;
 
+    // Second pass - look for any winner, or push a board on the stack to go deeper
+    int64_t board_to_push = -1;
+    for (const Move& m: next) {
+      Board new_b;
+      apply_move(b, m, new_b);
+      int64_t new_b_key = Compress(new_b);
       if (!tree.contains(new_b_key)) {
 	if (board_to_push == -1 && !visited.contains(new_b_key)) {
 	  board_to_push = new_b_key;
