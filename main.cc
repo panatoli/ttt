@@ -795,131 +795,6 @@ void analyze(const Board& in) {
   }
 }
 
-void analyze_recursive(const Board& b) {
-  if (tree.size() % (1<<PRINT_TREE_SIZE_RESOLUTION) == 0) {
-    std::cout << "tree.size() = " << tree.size() << "\n";
-    std::cout << "visited.size() = " << visited.size() << "\n";
-    #ifdef TREE_SIZE_LIMIT
-    if (tree.size() >= TREE_SIZE_LIMIT) {
-      play_known_endings();
-      abort();
-    }
-    #endif
-  }
-  int8_t other = 3 - b.move;
-  int64_t compressed = Compress(b);
-  int e[3][3];
-  effective_positions(b.positions, e);
-  #ifdef DEBUG
-  std::cout << "analzye()\n";
-  print_board(b);
-  if (tree.contains(compressed)) {
-    std::cout << "Unexpected tree state";
-    abort();
-  }
-  
-  std::cout << "Move = " << static_cast<int>(b.move) << "\n";
-  std::cout << "Other = " << static_cast<int>(other) << "\n";
-  std::cout << "Winner b.move ? " << winner(e, b.move) << "\n";
-  std::cout << "Winner other ? " << winner(e, other) << "\n";
-  std::cout << "tree.size() = " << tree.size() << "\n";
-  #endif
-  #ifdef DEBUG
-  std::cout << "tree.size() = " << tree.size() << "\n";
-  #endif
-  if (winner(e, other)) {
-    tree[compressed] = {.outcome = other, .moves_to_outcome = 0};
-    return;
-  } else if (winner(e, b.move)) {
-    tree[compressed] = {.outcome = b.move, .moves_to_outcome = 0};
-    return;
-  }
-  #ifdef LIMIT_TOTAL_MOVES
-  else if (b.moves_so_far == MOVES_TO_DRAW) {
-    tree[compressed] = {.outcome = D, .moves_to_outcome = 0};
-    return;
-  }
-  #endif
-  
-  visited.insert(compressed);
-  
-  #ifdef DEBUG
-  std::cout << "No winner here.\n";
-  #endif
-  Move best_move;
-  int8_t moves_to_best = -1;
-  int8_t best_outcome = other;
-  auto next = next_moves(b);
-  #ifdef DEBUG
-  std::cout << "Looking for best move amongs " << next.size() << " possible moves\n";
-  #endif
-  for (const Move& m: next) {
-    Board new_b;
-    apply_move(b, m, new_b);
-    int64_t n_c = Compress(new_b);
-    if (!tree.contains(n_c)) {
-      analyze(new_b);
-    }
-    Metadata n_md = tree[n_c];
-    // Should either have an outcome or be visited
-    #ifdef DEBUG
-    if (!n_md.outcome and !visited.contains(n_c)) {
-      std::cout << "Unexpected tree state:";
-      abort();
-    } 
-    #endif
-    if (n_md.outcome == b.move) {
-      #ifdef DEBUG
-      std::cout << "Found a winning move\n";
-      #endif
-      // Found a winning move
-      if (best_outcome != b.move || moves_to_best > n_md.moves_to_outcome) {
-	moves_to_best = n_md.moves_to_outcome + 1;
-	best_move = m;
-	best_outcome = b.move;
-	if (moves_to_best/* == 1*/) {
-	  // We're not going to find a better move.
-	  break;
-	}
-      }
-    } else if (n_md.outcome == D) {
-      #ifdef DEBUG
-      std::cout << "Found a draw\n";
-      #endif
-      if (best_outcome != D || (moves_to_best == -1 || n_md.moves_to_outcome < moves_to_best)) {
-        moves_to_best = n_md.moves_to_outcome + 1;
-	best_move = m;
-	best_outcome = D;
-      }
-    } else if (visited.contains(n_c)) {
-      #ifdef DEBUG
-      std::cout << "Found a visited board\n";
-      #endif
-      // Visited
-      moves_to_best = 1;
-      best_move = m;
-    } else if (n_md.outcome == other && best_outcome == other) {
-      #ifdef DEBUG
-      std::cout << "Found a losing move\n";
-      #endif
-      if (n_md.moves_to_outcome >= moves_to_best) {
-        moves_to_best = n_md.moves_to_outcome + 1;
-	best_move = m;
-      }
-    }
-  }
-  tree[compressed] = {.best_move = best_move, .outcome = best_outcome, .moves_to_outcome = moves_to_best};
-  visited.erase(compressed);
-  #ifdef DEBUG
-  print_board(b);
-  std::cout << "Best move:\n";
-  print_move(best_move);
-  std::cout << "moves_to_best: " << static_cast<int>(moves_to_best) << "\n";
-  std::cout << "Winner: " << static_cast<int>(best_outcome) << "\n";
-  std::cout << "\n\n\n";
-  #endif
-}
-
 void move(Board& b, int8_t color, int8_t size, int8_t i, int8_t j, int8_t from_i = -1, int8_t from_j = -1) {
   Move m = {.from_i = from_i, .from_j = from_j, .to_i = i, .to_j = j, .size = size, .color = color};
   Board out;
@@ -1014,8 +889,8 @@ void from_position() {
 }
 
 int main() {
-  //min_max();
-  read_from_file();
+  min_max();
+  //read_from_file();
   //from_position();
   play(init_board());
   return 0;
