@@ -14,7 +14,7 @@
 //#define MOVES_TO_DRAW 32
 //#define LIMIT_TOTAL_MOVES
 
-#define PRINT_TREE_SIZE_RESOLUTION 16
+#define PRINT_TREE_SIZE_RESOLUTION 12
 #define TREE_SIZE_LIMIT  100000000000
 #define STACK_SIZE_LIMIT 100000000000
 
@@ -698,6 +698,11 @@ void analyze(const Board& in) {
       Board new_b;
       apply_move(b, m, new_b);
       int64_t new_b_key = Compress(new_b);
+      // Check for win in 1 while we're here.
+      if (winner(new_b) == b.move) {
+	tree[new_b_key] = {.outcome = b.move, .moves_to_outcome = 0};
+      }
+
       if (!tree.contains(new_b_key)) {
 	if (board_to_push == -1 && !visited.contains(new_b_key)) {
 	  board_to_push = new_b_key;
