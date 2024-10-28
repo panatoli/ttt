@@ -14,9 +14,9 @@
 //#define MOVES_TO_DRAW 32
 //#define LIMIT_TOTAL_MOVES
 
-#define PRINT_TREE_SIZE_RESOLUTION 0
-#define TREE_SIZE_LIMIT 1000
-#define STACK_SIZE_LIMIT 30
+#define PRINT_TREE_SIZE_RESOLUTION 16
+#define TREE_SIZE_LIMIT 100000000000
+#define STACK_SIZE_LIMIT 30000000000
 
 //#define DEBUG
 
@@ -194,7 +194,7 @@ void print_move(const Move& m) {
 }
 
 void print_board(const Board& b) {
-  std::string s = "";
+  std::string s = "\n\n";
   for (int row = 0; row < 17; row++) {
     for (int col = 0; col < 17; col++) {
       if (row == 5 || row == 11) {
@@ -690,25 +690,40 @@ void analyze(const Board& in) {
       continue;
     }
  
+    // First pass
+    int64_t board_to_push = -1;
+    bool found_winner = false;
     auto next = next_moves(b);
-    bool pushed = false;
     for (const Move& m: next) {
       Board new_b;
       apply_move(b, m, new_b);
       int64_t new_b_key = Compress(new_b);
       if (!tree.contains(new_b_key)) {
-	s.push(new_b_key);
-	visited.insert(new_b_key);
-	pushed = true;
-	break;
+	if (board_to_push == -1 && !visited.contains(new_b_key)) {
+	  board_to_push = new_b_key;
+	}
+      } else {
+	Metadata n_md = tree[new_b_key];
+	if (n_md.outcome == b.move) {
+	  // Found a winning move, no point to continue
+	  tree[b_key] = {.best_move = m, .outcome = b.move, .moves_to_outcome = n_md.moves_to_outcome + 1};
+          s.pop();
+          visited.erase(b_key);
+	  found_winner = true;
+	  break;
+	}
       }
     }
-    if (pushed) {
-      // We'll get back to current board b after all children are analyzed.
+    if (found_winner)
+      continue;
+    if (board_to_push > -1) {
+      // We'll get back to current board b after children are analyzed.
+      s.push(board_to_push);
+      visited.insert(board_to_push);
       continue;
     }
-    // Nothing pushed we can compute the next best move.
-    
+
+    // Nothing pushed we can compute the next best move.    
     #ifdef DEBUG
     std::cout << "Looking for best move amongs " << next.size() << " possible moves\n";
     #endif
@@ -719,31 +734,6 @@ void analyze(const Board& in) {
       Board new_b;
       apply_move(b, m, new_b);
       int64_t new_b_key = Compress(new_b);
-      if (!tree.contains(new_b_key)) {
-	std::cout << "Key missing in tree when expected - aborting";
-	abort();
-      }
-      Metadata n_md = tree[new_b_key];
-      if (n_md.outcome == b.move) {
-        // Found a winning move
-	#ifdef DEBUG
-        std::cout << "Found a winning move\n";
-        #endif
-        if (best_outcome != b.move || moves_to_best > n_md.moves_to_outcome) {
-	  moves_to_best = n_md.moves_to_outcome + 1;
-	  best_move = m;
-	  best_outcome = b.move;
-	  if (moves_to_best == 1) {
-	    // We're not going to find a better move.
-	    break;
-	  }
-	}
-	continue;
-      }
-      if (best_outcome == b.move) {
-	// We can't improve what we have.
-	continue;
-      }
       if (visited.contains(new_b_key)) {
 	#ifdef DEBUG
         std::cout << "Found a draw by repetition\n";
@@ -751,7 +741,16 @@ void analyze(const Board& in) {
         moves_to_best = 1;
         best_move = m;
 	best_outcome = D;
-      } else if (n_md.outcome == D && (moves_to_best == -1 || moves_to_best > n_md.moves_to_outcome)) {
+	// That's the best we can get at this point.
+	break;
+      }
+
+      if (!tree.contains(new_b_key)) {
+	std::cout << "Key missing in tree when expected - aborting\n";
+	abort();
+      }
+      Metadata n_md = tree[new_b_key];
+      if (n_md.outcome == D && (moves_to_best == -1 || moves_to_best > n_md.moves_to_outcome)) {
 	#ifdef DEBUG
         std::cout << "Found a draw\n";
         #endif
