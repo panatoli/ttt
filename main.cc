@@ -921,7 +921,7 @@ void move(Board& b, int8_t color, int8_t size, int8_t i, int8_t j, int8_t from_i
 
 void min_max() {
   analyze(init_board());
-  play_known_endings();
+  play(init_board());
 }
 
 
