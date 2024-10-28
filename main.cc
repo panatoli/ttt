@@ -1,4 +1,6 @@
 #include <iostream>
+#include <sstream>
+#include <fstream>
 #include <vector>
 #include <map>
 #include <stack>
@@ -930,9 +932,64 @@ void move(Board& b, int8_t color, int8_t size, int8_t i, int8_t j, int8_t from_i
   b = out;
 }
 
+// Writes board outcomes into a file
+void dump_to_file() {
+  std::ofstream file("outcomes.csv");
+  for (const auto& [k, v] : tree) {
+    file << k << ", ";
+    file << static_cast<int>(v.best_move.color) << ",";
+    file << static_cast<int>(v.best_move.size) << ",";
+    file << static_cast<int>(v.best_move.from_i) << ",";
+    file << static_cast<int>(v.best_move.from_j) << ",";
+    file << static_cast<int>(v.best_move.to_i) << ",";
+    file << static_cast<int>(v.best_move.to_j) << ",";
+    file << static_cast<int>(v.outcome) << ",";
+    file << v.moves_to_outcome << "\n";
+  }
+  file.close();
+}
+
+void read_from_file() {
+  std::ifstream file("outcomes.csv");
+
+  long count = 0;
+  std::string line;
+  while (std::getline(file, line)) {
+    if (count % (1 << PRINT_TREE_SIZE_RESOLUTION) == 0) {
+      std::cout << "Read " << count << " entries from file\n";
+    }
+    count += 1;
+    std::stringstream ss(line);
+    std::string item;
+
+    std::vector<std::string> values;
+    while (std::getline(ss, item, ',')) {
+      values.push_back(item);
+    }
+    if (values.size() != 9) {
+      std::cout << "Unexpected number of values in line: " << line << "\n";
+      abort();
+    }
+
+    int64_t k = std::stol(values[0]);
+    Metadata v;
+    v.best_move.color = std::stoi(values[1]);
+    v.best_move.size = std::stoi(values[2]);
+    v.best_move.from_i = std::stoi(values[3]);
+    v.best_move.from_j = std::stoi(values[4]);
+    v.best_move.to_i = std::stoi(values[5]);
+    v.best_move.to_j = std::stoi(values[6]);
+    v.outcome = std::stoi(values[7]);
+    v.moves_to_outcome = std::stoi(values[8]);
+
+    tree[k] = v;
+  }
+  file.close();
+}
+
 void min_max() {
   analyze(init_board());
-  play(init_board());
+  dump_to_file();
 }
 
 
@@ -957,7 +1014,9 @@ void from_position() {
 }
 
 int main() {
-  min_max();
+  //min_max();
+  read_from_file();
   //from_position();
+  play(init_board());
   return 0;
 }
