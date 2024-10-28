@@ -5,7 +5,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-// clang++ -std=c++20 main.cc -o bin && ./bin -v
+// clang++ -std=c++20 -O2 main.cc -o bin && ./bin -v
 
 #define W 0x1
 #define B 0x2
@@ -15,8 +15,8 @@
 //#define LIMIT_TOTAL_MOVES
 
 #define PRINT_TREE_SIZE_RESOLUTION 12
-#define TREE_SIZE_LIMIT  100000000000
-#define STACK_SIZE_LIMIT 100000000000
+//#define TREE_SIZE_LIMIT  100000000000
+//#define STACK_SIZE_LIMIT 100000000000
 
 //#define DEBUG
 
@@ -250,7 +250,7 @@ void print_board(const Board& b) {
   #endif
   s += "\nTo move:";
   s += b.move == W ?  "\033[1;43m \033[0m" : "\033[1;44m \033[0m";
-  s += "\n\n";
+  s += "\n";
 
   std::cout << s;
 }
@@ -583,7 +583,7 @@ void test_next_moves() {
 }
 
 struct Metadata {
-  Move best_move = {0};
+  Move best_move = {0}; // 6 Bytes
   // W / B / D / 0 (unknown)
   int8_t outcome = 0;
   int32_t moves_to_outcome = -1;
@@ -610,7 +610,14 @@ void play(const Board& in) {
     Metadata md = tree[c];
     Board b2;
 
-    std::cout << "Winning: " << static_cast<int>(md.outcome) << ", in " << static_cast<int>(md.moves_to_outcome) << " moves\n";
+    std::string w = "noone";
+    if (md.outcome == W) {
+      w = "\033[1;43m \033[0m";
+    } else if (md.outcome == B) {
+      w = "\033[1;44m \033[0m";
+    }
+     
+    std::cout << w << " is winning in " << static_cast<int>(md.moves_to_outcome) << " moves\n";
     if (md.moves_to_outcome > 0) {
       apply_move(b, md.best_move, b2);
       b = b2;
@@ -674,10 +681,14 @@ void analyze(const Board& in) {
     int64_t b_key = s.top();
     Board b = Decompress(b_key);
     int8_t other = 3 - b.move;
+
+    #ifdef DEBUG
     if (tree.contains(b_key)) {
       std::cout << "Did not expect this key in the tree.";
       abort();
     }
+    #endif
+
     int8_t w = winner(b);
     if (w > -1) {
       tree[b_key] = {.outcome = w, .moves_to_outcome = 0};
@@ -728,7 +739,7 @@ void analyze(const Board& in) {
       continue;
     }
 
-    // Nothing pushed we can compute the next best move.    
+    // Nothing pushed, we can compute the next best move.    
     #ifdef DEBUG
     std::cout << "Looking for best move amongs " << next.size() << " possible moves\n";
     #endif
