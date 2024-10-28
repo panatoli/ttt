@@ -13,6 +13,9 @@
 #define B 0x2
 #define D 0x3
 
+#define FROM_FILE true
+#define DUMP_TO_FILE true // Will only dump if FROM_FILE is false
+
 //#define MOVES_TO_DRAW 32
 //#define LIMIT_TOTAL_MOVES
 
@@ -877,7 +880,9 @@ void read_from_file() {
 
 void min_max() {
   analyze(init_board());
-  dump_to_file();
+  if (DUMP_TO_FILE) {
+    dump_to_file();
+  }
 }
 
 
@@ -902,8 +907,11 @@ void from_position() {
 }
 
 int main() {
-  min_max();
-  //read_from_file();
+  if (FROM_FILE) {
+    read_from_file();
+  } else {
+    min_max();
+  }
   //from_position();
   play(init_board());
   return 0;
