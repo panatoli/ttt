@@ -656,8 +656,8 @@ void analyze(const Board& in) {
   visited.insert(Compress(in));
   while (!s.empty()) {
     if (tree.size() % (1<<PRINT_TREE_SIZE_RESOLUTION) == 0) {
-      std::cout << "tree.size() = " << tree.size() << "\n";
-      std::cout << "stack.size() = " << s.size() << "\n";
+      std::cout << "tree.size()    = " << tree.size() << "\n";
+      std::cout << "stack.size()   = " << s.size() << "\n";
       std::cout << "visited.size() = " << visited.size() << "\n";
       #ifdef TREE_SIZE_LIMIT
       if (tree.size() >= TREE_SIZE_LIMIT) {
