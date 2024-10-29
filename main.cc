@@ -57,8 +57,8 @@ int add_to_position(int position, int size, int color) {
 using CompressedBoard = int64_t;
 
 CompressedBoard Compress(const Board& b) {
-  std::map<int, std::vector<std::pair<int, int>>> white_locations; 
-  std::map<int, std::vector<std::pair<int, int>>> black_locations; 
+  std::map<int, std::vector<std::pair<int, int>>> white_locations;
+  std::map<int, std::vector<std::pair<int, int>>> black_locations;
   for (int i = 0; i < 3; i++) {
     for (int j = 0; j < 3; j++) {
       for (int k = 0; k < 3; k++) {
@@ -71,7 +71,7 @@ CompressedBoard Compress(const Board& b) {
 	}
       }
     }
-  } 
+  }
   for (int size = 0 ; size < 3; size++) {
     for (int dummy = 0; dummy < b.white_pieces[size]; dummy++) {
       white_locations[size].push_back(std::make_pair(3,3));
@@ -82,7 +82,7 @@ CompressedBoard Compress(const Board& b) {
   }
 
   CompressedBoard out = 0;
-  
+
   for (int size = 0; size < 3; size++) {
     for (int k = 0; k < 2; k++) {
       auto pair = white_locations.at(size)[k];
@@ -92,7 +92,7 @@ CompressedBoard Compress(const Board& b) {
       out = out * 4 + j;
     }
   }
-   
+
   for (int size = 0; size < 3; size++) {
     for (int k = 0; k < 2; k++) {
       auto pair = black_locations.at(size)[k];
@@ -102,7 +102,7 @@ CompressedBoard Compress(const Board& b) {
       out = out * 4 + j;
     }
   }
-  
+
   out = out * 4 + b.move;
 
   #ifdef LIMIT_TOTAL_MOVES
@@ -115,9 +115,9 @@ CompressedBoard Compress(const Board& b) {
 Board Decompress(CompressedBoard b) {
   std::map<int, std::vector<std::pair<int, int>>> white_locations;
   std::map<int, std::vector<std::pair<int, int>>> black_locations;
-  
-  Board out = {0};  
-  
+
+  Board out = {0};
+
   #ifdef LIMIT_TOTAL_MOVES
   out.moves_so_far = b % 256;
   b = b / 256;
@@ -145,7 +145,7 @@ Board Decompress(CompressedBoard b) {
       white_locations[size].push_back(std::make_pair(i,j));
     }
   }
-  
+
   for (int size = 0; size < 3; size++) {
     for (auto [i, j] : white_locations[size]) {
       if (i == 3) {
@@ -343,7 +343,7 @@ bool apply_move(const Board& b, const Move& m, Board& new_b) {
   } else {
     // Has to move it.
     if (m.from_i == m.to_i && m.from_j == m.to_j) return false;
-   
+
      // Existing piece. Check that it's a top piece in the position, and that it's the right color.
     int from_position = b.positions[m.from_i][m.from_j];
     if (biggest_size(from_position) != m.size) return false;
@@ -400,12 +400,12 @@ void test_moves() {
   Board b2;
   std::cout << apply_move(b, m, b2) << "\n";
   print_board(b2);
-  
+
   b = b2;
   m = {.from_i = -1, .from_j = -1, .to_i = 1, .to_j = 1, .size = 0, .color = B};
   std::cout << apply_move(b, m, b2) << "\n";
   print_board(b2);
-  
+
   b = b2;
   m = {.from_i = -1, .from_j = -1, .to_i = 2, .to_j = 2, .size = 2, .color = W};
   std::cout << apply_move(b, m, b2) << "\n";
@@ -440,7 +440,7 @@ bool winner(const int e[3][3], int color) {
     if (win)
       return true;
   }
-  
+
   // Main diagonal
   bool win = true;
   for (int i = 0; i < 3; i++)
@@ -484,7 +484,7 @@ void test_winning() {
 
 std::vector<Move> next_moves_with_piece(const int positions[3][3], int8_t color, int8_t size, int8_t from_i, int8_t from_j) {
   #ifdef DEBUG
-  std::cout << "next_moves_with_piece(color = " << static_cast<int>(color) << ", size = " << static_cast<int>(size) << ", from: " << static_cast<int>(from_i) << ", " << static_cast<int>(from_j) << ")"; 
+  std::cout << "next_moves_with_piece(color = " << static_cast<int>(color) << ", size = " << static_cast<int>(size) << ", from: " << static_cast<int>(from_i) << ", " << static_cast<int>(from_j) << ")";
   #endif
   std::vector<Move> out;
   for (int8_t i = 0; i < 3; i++) {
@@ -621,7 +621,7 @@ void play(const Board& in) {
     } else if (md.outcome == B) {
       w = "\033[1;44m \033[0m";
     }
-     
+
     std::cout << w << " is winning in " << static_cast<int>(md.moves_to_outcome) << " moves\n";
     if (md.moves_to_outcome > 0) {
       apply_move(b, md.best_move, b2);
@@ -705,7 +705,7 @@ void analyze(const Board& in) {
       #endif
       continue;
     }
- 
+
     // First pass - look for win in 1.
     auto next = next_moves(b);
     bool found_winner = false;
@@ -757,7 +757,7 @@ void analyze(const Board& in) {
       continue;
     }
 
-    // Nothing pushed, we can compute the next best move.    
+    // Nothing pushed, we can compute the next best move.
     #ifdef DEBUG
     std::cout << "Looking for best move amongs " << next.size() << " possible moves\n";
     #endif
@@ -906,13 +906,129 @@ void from_position() {
   play(b);
 }
 
+Move get_user_move(const Board& board) {
+  int8_t size;
+  int8_t from_i = -1;
+  int8_t from_j = -1;
+  int8_t to_i;
+  int8_t to_j;
+
+  int choice;
+  std::cout << "\nWould you like to...\n";
+  std::cout << "1. Play a new piece\n";
+  std::cout << "2. Move a piece already on the board\n";
+
+  std::cin >> choice;
+  if (choice == 1) {
+    std::cout << "Choose a size for your piece...\n";
+    std::cout << "1. Big\n";
+    std::cout << "2. Medium\n";
+    std::cout << "3. Small\n";
+    std::cin >> choice;
+    size = static_cast<int8_t>(choice-1);
+  } else if (choice == 2) {
+    std::cout << "Which piece would you like to move?\n";
+    std::cout << "   1  |  2  |  3\n";
+    std::cout << "-----------------\n";
+    std::cout << "   4  |  5  |  6\n";
+    std::cout << "-----------------\n";
+    std::cout << "   7  |  8  |  9\n";
+    std::cin >> choice;
+    choice -= 1;
+    from_i = choice / 3;
+    from_j = choice % 3;
+    size = biggest_size(board.positions[from_i][from_j]);
+  } else {
+    return get_user_move(board);
+  }
+  std::cout << "Where would you like to move it?\n";
+  std::cout << "   1  |  2  |  3\n";
+  std::cout << "-----------------\n";
+  std::cout << "   4  |  5  |  6\n";
+  std::cout << "-----------------\n";
+  std::cout << "   7  |  8  |  9\n";
+  std::cin >> choice;
+  choice -= 1;
+  to_i = choice / 3;
+  to_j = choice % 3;
+  return {.size = size, .color = board.move, .from_i = from_i, .from_j = from_j, .to_i = to_i, .to_j = to_j};
+}
+
+void play() {
+  int choice;
+  int roboplayer = 99;
+  while (roboplayer == 99) {
+    std::cout << "Welcome! Choose an option:\n";
+    std::cout << "1. Play Orange (first player to move)\n";
+    std::cout << "2. Play Blue\n";
+    std::cout << "3. Play For Both Sides (a.k.a Analyze Position)\n";
+    std::cout << "4. Exit\n";
+
+    std::cin >> choice;
+    switch (choice) {
+      case 1:
+	roboplayer = B;
+	break;
+      case 2:
+	roboplayer = W;
+	break;
+      case 3:
+	roboplayer = -1;
+	break;
+      case 4:
+	std::cout << "Farewell...\n\n";
+	return;
+      default:
+	break;
+    }
+  }
+
+  std::cout << "\n\n\n\n\n\n\n\n\n\n\n LET THE GAME BEGIN!! \n\n\n\n\n\n\n";
+  Board b = init_board();
+  int move_count = 0;
+  while (1) {
+    std::cout << "\n\nBoard state after " << move_count << " moves:\n";
+    print_board(b);
+    int64_t c = Compress(b);
+    if (!tree.contains(c)) {
+      std::cout << "Missing expected state in tree: " << c << "\n";
+      abort();
+    }
+    Metadata md = tree[c];
+
+    std::string w = "noone";
+    if (md.outcome == W) {
+      w = "\033[1;43m \033[0m";
+    } else if (md.outcome == B) {
+      w = "\033[1;44m \033[0m";
+    }
+    std::cout << "\n[Analysis]: " << w << " is winning in " << static_cast<int>(md.moves_to_outcome) << " moves\n";
+
+    if (md.moves_to_outcome == 0) {
+      std::cout << "\n\n   THE END \n\n";
+      play();
+    }
+
+    Move move = b.move == roboplayer ? md.best_move : get_user_move(b);
+    //print_move(move);
+    Board b2;
+    if (!apply_move(b, move, b2)) {
+      std::cout << "Illegal move, try again...\n\n";
+      continue;
+    }
+    b = b2;
+    move_count += 1;
+  }
+}
+
 int main() {
   if (FROM_FILE) {
     read_from_file();
   } else {
     min_max();
   }
+  play();
   //from_position();
-  play(init_board());
+  //play(init_board());
   return 0;
 }
