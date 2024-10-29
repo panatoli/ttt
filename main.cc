@@ -235,7 +235,7 @@ void print_board(const Board& b) {
   std::cout << s;
 
   s = "\nAvailable Pieces:\n";
-  s = "Color | Big | Medium | Small\n";
+  s += "Color | Big | Medium | Small\n";
   s += "\033[1;43m \033[0m";
   for (int i = 0; i < 3; i++) {
     char s2[10];
@@ -941,7 +941,8 @@ Move get_user_move(const Board& board) {
 
   std::cin >> choice;
   if (choice == 9) {
-    return {.size = -1};
+    std::cout << "Exiting...\n";
+    return {.size = -2};
   } else if (choice == 1) {
     std::cout << "Choose a size for your piece...\n";
     std::cout << "1. Big\n";
@@ -1036,10 +1037,10 @@ void play() {
   int roboplayer = 99;
   while (roboplayer == 99) {
     std::cout << "Welcome! Choose an option:\n";
-    std::cout << "1. Play Orange (first player to move)\n";
-    std::cout << "2. Play Blue\n";
+    std::cout << "1. Play \033[1;43mOrange\033[0m (first player to move)\n";
+    std::cout << "2. Play \033[1;44mBlue\033[0m\n";
     std::cout << "3. Play For Both Sides (a.k.a Analyze Position)\n";
-    std::cout << "4. Exit\n";
+    std::cout << "9. Exit\n";
 
     std::cin >> choice;
     switch (choice) {
@@ -1052,7 +1053,7 @@ void play() {
       case 3:
 	roboplayer = -1;
 	break;
-      case 4:
+      case 9:
 	std::cout << "Farewell...\n\n";
 	return;
       default:
@@ -1114,7 +1115,7 @@ void play() {
 
     Move move = b.move == roboplayer ? md.best_move : get_user_move(b);
     Board b2;
-    if (move.size == -1) {
+    if (move.size < -1) {
       // Special exit code.
       return play();
     }
