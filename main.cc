@@ -13,7 +13,7 @@
 #define B 0x2
 #define D 0x3
 
-#define FROM_FILE false
+#define FROM_FILE true
 #define DUMP_TO_FILE true // Will only dump if FROM_FILE is false
 
 //#define MOVES_TO_DRAW 32
@@ -234,7 +234,8 @@ void print_board(const Board& b) {
   }
   std::cout << s;
 
-  s = "\nColor | Big | Medium | Small\n";
+  s = "\nAvailable Pieces:\n";
+  s = "Color | Big | Medium | Small\n";
   s += "\033[1;43m \033[0m";
   for (int i = 0; i < 3; i++) {
     char s2[10];
@@ -923,6 +924,8 @@ void from_position() {
   play(b);
 }
 
+void play();
+
 Move get_user_move(const Board& board) {
   int8_t size;
   int8_t from_i = -1;
@@ -931,12 +934,24 @@ Move get_user_move(const Board& board) {
   int8_t to_j;
 
   int choice;
-  std::cout << "\nWould you like to...\n";
+
+  std::string color;
+  if (board.move == W) {
+    color  = "\033[1;43m \033[0m";
+  } else if (board.move == B) {
+    color = "\033[1;44m \033[0m";
+  }
+
+  std::cout << "\n" << color << "'s move\n";
+  std::cout << "Would you like to...\n\n";
   std::cout << "1. Play a new piece\n";
   std::cout << "2. Move a piece already on the board\n";
+  std::cout << "9. Exit to main menu\n";
 
   std::cin >> choice;
-  if (choice == 1) {
+  if (choice == 9) {
+    play();
+  } else if (choice == 1) {
     std::cout << "Choose a size for your piece...\n";
     std::cout << "1. Big\n";
     std::cout << "2. Medium\n";
@@ -1003,15 +1018,28 @@ void play() {
   std::cout << "\n\n\n\n\n\n\n\n\n\n\n LET THE GAME BEGIN!! \n\n\n\n\n\n\n";
   Board b = init_board();
   int move_count = 0;
+  std::unordered_map<int64_t, int> encountered_positions;
   while (1) {
     std::cout << "\n\nBoard state after " << move_count << " moves:\n";
     print_board(b);
     int64_t c = Compress(b);
+    if (encountered_positions.contains(c)) {
+      std::cout << "\n\n DRAW BY REPETITION ... THANKS FOR PLAYING\n\n";
+      std::cout << "Position already occured in move: " << encountered_positions[c];
+      play();
+    }
+
+    Metadata md = {0};
     if (!tree.contains(c)) {
       std::cout << "Missing expected state in tree: " << c << "\n";
-      abort();
+      std::cout << "Contact the development team\n";
+      md.moves_to_outcome = -1;
+      if (b.move == roboplayer) {
+        std::cout << "Resetting... \n";
+	play();
+      }
     }
-    Metadata md = tree[c];
+    md = tree[c];
 
     std::string w = "noone";
     if (md.outcome == W) {
@@ -1022,7 +1050,7 @@ void play() {
     std::cout << "\n[Analysis]: " << w << " is winning in " << static_cast<int>(md.moves_to_outcome) << " moves\n";
 
     if (md.moves_to_outcome == 0) {
-      std::cout << "\n\n   THE END \n\n";
+      std::cout << "\n\n   THE END ... THANKS FOR PLAYING \n\n";
       play();
     }
 
@@ -1033,6 +1061,7 @@ void play() {
       std::cout << "Illegal move, try again...\n\n";
       continue;
     }
+    encountered_positions[c] = move_count;
     b = b2;
     move_count += 1;
   }
