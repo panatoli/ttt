@@ -13,13 +13,13 @@
 #define B 0x2
 #define D 0x3
 
-#define FROM_FILE true
+#define FROM_FILE false
 #define DUMP_TO_FILE true // Will only dump if FROM_FILE is false
 
 //#define MOVES_TO_DRAW 32
 //#define LIMIT_TOTAL_MOVES
 
-#define PRINT_TREE_SIZE_RESOLUTION 12
+#define PRINT_TREE_SIZE_RESOLUTION 15
 //#define TREE_SIZE_LIMIT  100000000000
 //#define STACK_SIZE_LIMIT 100000000000
 
@@ -689,6 +689,9 @@ void analyze(const Board& in) {
 
     #ifdef DEBUG
     if (tree.contains(b_key)) {
+      // TODO: This is probably wrong. It could be that we encountered this possition downstream
+      // and marked it as a D. Better check that it's a D with 0 moves to outcome
+      // (although that too might not be the only case...).
       std::cout << "Did not expect this key in the tree.";
       abort();
     }
@@ -879,7 +882,21 @@ void read_from_file() {
 }
 
 void min_max() {
-  analyze(init_board());
+  Board b = init_board();
+  analyze(b);
+
+  // Also analyze for every W first move to learn optimal play as B.
+  int i = 1;
+  for (const Move& m: next_moves(b)) {
+    std::cout << "After analyzing " << i << " initial positions hash size is: " << tree.size();
+    Board new_b;
+    apply_move(b, m, new_b);
+    std::cout << "\nAnalyzing starting from:\n";
+    print_board(new_b);
+    analyze(new_b);
+    i += 1;
+  }
+
   if (DUMP_TO_FILE) {
     dump_to_file();
   }
