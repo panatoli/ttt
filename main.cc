@@ -1077,12 +1077,16 @@ void play() {
     Metadata md = {0};
     if (!tree.contains(c)) {
       std::cout << "Missing expected state in tree: " << c << "\n";
-      std::cout << "Contact the development team\n";
+      std::cout << "Thinking...\n";
+      analyze(b);
+      std::cout << "Done Thinking\n";
+      /*
       md.moves_to_outcome = -1;
       if (b.move == roboplayer) {
         std::cout << "Resetting... \n";
 	return play();
       }
+      */
     }
     md = tree[c];
 
