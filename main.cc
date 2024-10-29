@@ -934,15 +934,6 @@ Move get_user_move(const Board& board) {
   int8_t to_j;
 
   int choice;
-
-  std::string color;
-  if (board.move == W) {
-    color  = "\033[1;43m \033[0m";
-  } else if (board.move == B) {
-    color = "\033[1;44m \033[0m";
-  }
-
-  std::cout << "\n" << color << "'s move\n";
   std::cout << "Would you like to...\n\n";
   std::cout << "1. Play a new piece\n";
   std::cout << "2. Move a piece already on the board\n";
@@ -950,7 +941,7 @@ Move get_user_move(const Board& board) {
 
   std::cin >> choice;
   if (choice == 9) {
-    play();
+    return {.size = -1};
   } else if (choice == 1) {
     std::cout << "Choose a size for your piece...\n";
     std::cout << "1. Big\n";
@@ -984,6 +975,60 @@ Move get_user_move(const Board& board) {
   to_i = choice / 3;
   to_j = choice % 3;
   return {.size = size, .color = board.move, .from_i = from_i, .from_j = from_j, .to_i = to_i, .to_j = to_j};
+}
+
+// Applied the given move to the given board to get a new board position.
+// Returns false if the move cannot be applied.
+// Similar to apply_move() but with ehnacned safety checks.
+bool safe_apply_move(const Board& b, const Move& m, Board& new_b) {
+  new_b = b;
+  if (!is_board_consistent(b)) {
+    std::cout << "DBG: inconsisten board: ";
+    print_board(b);
+    abort();
+  }
+  if (b.move != m.color) {
+    std::cout << "DBG: inconsisten color: ";
+    char dbg[50];
+    sprintf(dbg, "move color unexpected: b.move = %d, m.color = %d\n", b.move, m.color);
+    std::cout << "DBG: " << dbg;
+    abort();
+  }
+  if (m.from_i == -1) {
+    // New piece. Reduce the corresponding counter.
+    if (m.color == W) {
+      if (b.white_pieces[m.size] == 0)
+	return false;
+      new_b.white_pieces[m.size] -= 1;
+    } else if (m.color == B) {
+      if (b.black_pieces[m.size] == 0)
+	return false;
+      new_b.black_pieces[m.size] -= 1;
+    } else {
+      return false;
+    }
+  } else {
+    // Has to move it.
+    if (m.from_i == m.to_i && m.from_j == m.to_j) return false;
+
+     // Existing piece. Check that it's a top piece in the position, and that it's the right color.
+    int from_position = b.positions[m.from_i][m.from_j];
+    if (biggest_size(from_position) != m.size) return false;
+    if (sub_pos(from_position, m.size) != m.color) return false;
+
+    // Remove piece
+    new_b.positions[m.from_i][m.from_j] = remove_from_position(from_position,  m.size);
+  }
+  // Check new position
+  int to_position = b.positions[m.to_i][m.to_j];
+  int k = biggest_size(to_position);
+  if (k != -1 and k <= m.size) return false;
+
+  // Add piece
+  new_b.positions[m.to_i][m.to_j] = add_to_position(to_position, m.size, m.color);
+  new_b.move = b.move == W ? B : W;
+
+  return is_board_consistent(new_b);
 }
 
 void play() {
@@ -1026,7 +1071,7 @@ void play() {
     if (encountered_positions.contains(c)) {
       std::cout << "\n\n DRAW BY REPETITION ... THANKS FOR PLAYING\n\n";
       std::cout << "Position already occured in move: " << encountered_positions[c];
-      play();
+      return play();
     }
 
     Metadata md = {0};
@@ -1036,7 +1081,7 @@ void play() {
       md.moves_to_outcome = -1;
       if (b.move == roboplayer) {
         std::cout << "Resetting... \n";
-	play();
+	return play();
       }
     }
     md = tree[c];
@@ -1051,13 +1096,25 @@ void play() {
 
     if (md.moves_to_outcome == 0) {
       std::cout << "\n\n   THE END ... THANKS FOR PLAYING \n\n";
-      play();
+      return play();
     }
 
+    std::string color;
+    if (b.move == W) {
+      color  = "\033[1;43m \033[0m";
+    } else if (b.move == B) {
+      color = "\033[1;44m \033[0m";
+    }
+
+    std::cout << "\n" << color << "'s move\n";
+
     Move move = b.move == roboplayer ? md.best_move : get_user_move(b);
-    //print_move(move);
     Board b2;
-    if (!apply_move(b, move, b2)) {
+    if (move.size == -1) {
+      // Special exit code.
+      return play();
+    }
+    if (!safe_apply_move(b, move, b2)) {
       std::cout << "Illegal move, try again...\n\n";
       continue;
     }
