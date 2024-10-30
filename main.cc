@@ -13,8 +13,8 @@
 #define B 0x2
 #define D 0x3
 
-#define FROM_FILE true
-#define DUMP_TO_FILE true // Will only dump if FROM_FILE is false
+#define FILENAME "db.csv"
+#define DUMP_TO_FILE true // Will only dump if the file cannot be found
 
 //#define MOVES_TO_DRAW 32
 //#define LIMIT_TOTAL_MOVES
@@ -829,7 +829,7 @@ void move(Board& b, int8_t color, int8_t size, int8_t i, int8_t j, int8_t from_i
 
 // Writes board outcomes into a file
 void dump_to_file() {
-  std::ofstream file("outcomes.csv");
+  std::ofstream file(FILENAME);
   for (const auto& [k, v] : tree) {
     file << k << ", ";
     file << static_cast<int>(v.best_move.color) << ",";
@@ -844,9 +844,7 @@ void dump_to_file() {
   file.close();
 }
 
-void read_from_file() {
-  std::ifstream file("outcomes.csv");
-
+void read_from_file(std::ifstream& file) {
   long count = 0;
   std::string line;
   while (std::getline(file, line)) {
@@ -879,7 +877,6 @@ void read_from_file() {
 
     tree[k] = v;
   }
-  file.close();
 }
 
 void min_max() {
@@ -1077,7 +1074,6 @@ void play() {
 
     Metadata md = {0};
     if (!tree.contains(c)) {
-      std::cout << "Missing expected state in tree: " << c << "\n";
       std::cout << "Thinking...\n";
       analyze(b);
       std::cout << "Done Thinking\n";
@@ -1100,7 +1096,8 @@ void play() {
     std::cout << "\n[Analysis]: " << w << " is winning in " << static_cast<int>(md.moves_to_outcome) << " moves\n";
 
     if (md.moves_to_outcome == 0) {
-      std::cout << "\n\n   THE END ... THANKS FOR PLAYING \n\n";
+      std::cout << "\n\n   " << w << " IS THE WINNER!! CONGRATULATIONS!\n\n";
+      std::cout << "   THANKS FOR PLAYING \n\n";
       return play();
     }
 
@@ -1130,13 +1127,14 @@ void play() {
 }
 
 int main() {
-  if (FROM_FILE) {
-    read_from_file();
+  std::ifstream file(FILENAME);
+  if (file) {
+    read_from_file(file);
+    file.close();
   } else {
+    std::cout << "Could not find " << FILENAME << " computing...\n";
     min_max();
   }
   play();
-  //from_position();
-  //play(init_board());
   return 0;
 }
