@@ -732,6 +732,7 @@ void analyze(const Board& in) {
 
     // Second pass - look for any winner, or push a board on the stack to go deeper
     int64_t board_to_push = -1;
+    int moves_to_win = -1;
     for (const Move& m: next) {
       Board new_b;
       apply_move(b, m, new_b);
@@ -743,17 +744,19 @@ void analyze(const Board& in) {
       } else {
 	Metadata n_md = tree[new_b_key];
 	if (n_md.outcome == b.move) {
-	  // Found a winning move, no point to continue
-	  tree[b_key] = {.best_move = m, .outcome = b.move, .moves_to_outcome = n_md.moves_to_outcome + 1};
-          s.pop();
-          visited.erase(b_key);
-	  found_winner = true;
-	  break;
+	  // Found a winning move, check if it's quicker than any previously found ones
+	  if (moves_to_win == -1 || n_md.moves_to_outcome < moves_to_win) {
+	    moves_to_win = 1 + n_md.moves_to_outcome;
+	    tree[b_key] = {.best_move = m, .outcome = b.move, .moves_to_outcome = moves_to_win};
+	  }
 	}
       }
     }
-    if (found_winner)
+    if (moves_to_win != -1) {
+      s.pop();
+      visited.erase(b_key);
       continue;
+    }
     if (board_to_push > -1) {
       // We'll get back to current board b after children are analyzed.
       s.push(board_to_push);
