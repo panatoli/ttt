@@ -578,8 +578,6 @@ struct Metadata {
 static std::unordered_map<int64_t, Metadata> tree = {};
 static std::unordered_set<int64_t> visited = {};
 
-
-
 void play(const Board& in) {
   Board b = in;
   std::cout << "\n\n\n\n\n\n\n\n\n\n\n LET THE GAME BEGIN!! \n\n\n\n\n\n\n";
@@ -603,7 +601,7 @@ void play(const Board& in) {
       w = "\033[1;44m \033[0m";
     }
 
-    std::cout << w << " is winning in " << static_cast<int>(md.moves_to_outcome) << " moves\n";
+    std::cout << w << " is winning in (at most) " << static_cast<int>(md.moves_to_outcome) << " moves\n";
     if (md.moves_to_outcome > 0) {
       apply_move(b, md.best_move, b2);
       b = b2;
@@ -899,12 +897,14 @@ Move get_user_move(const Board& board) {
   std::cout << "Would you like to...\n\n";
   std::cout << "1. Play a new piece\n";
   std::cout << "2. Move a piece already on the board\n";
+  std::cout << "8. Undo last move\n";
   std::cout << "9. Exit to main menu\n";
 
   std::cin >> choice;
   if (choice == 9) {
-    std::cout << "Exiting...\n";
-    return {.size = -2};
+    return {.size = -9};
+  } else if (choice == 8) {
+    return {.size = -8};
   } else if (choice == 1) {
     std::cout << "Choose a size for your piece...\n";
     std::cout << "1. Big\n";
@@ -1001,7 +1001,7 @@ void play() {
     std::cout << "Welcome! Choose an option:\n";
     std::cout << "1. Play \033[1;43mOrange\033[0m (first player to move)\n";
     std::cout << "2. Play \033[1;44mBlue\033[0m\n";
-    std::cout << "3. Play For Both Sides (a.k.a Analyze Position)\n";
+    std::cout << "3. Play For Both Sides\n";
     std::cout << "9. Exit\n";
 
     std::cin >> choice;
@@ -1024,43 +1024,46 @@ void play() {
   }
 
   std::cout << "\n\n\n\n\n\n\n\n\n\n\n LET THE GAME BEGIN!! \n\n\n\n\n\n\n";
-  Board b = init_board();
-  int move_count = 0;
   std::unordered_map<int64_t, int> encountered_positions;
+  std::stack<int64_t> positions_stack;
+  positions_stack.push(Compress(init_board()));
   while (1) {
-    std::cout << "\n\nBoard state after " << move_count << " moves:\n";
+    std::cout << "\n\nBoard state after " << positions_stack.size() - 1 << " moves:\n";
+    int64_t c = positions_stack.top();
+    Board b = Decompress(c);
     print_board(b);
-    int64_t c = Compress(b);
     if (encountered_positions.contains(c)) {
+      std::cout << "Position already occured in move: " << encountered_positions[c] << "\n";
       std::cout << "\n\n DRAW BY REPETITION ... THANKS FOR PLAYING\n\n";
-      std::cout << "Position already occured in move: " << encountered_positions[c];
       return play();
     }
 
     Metadata md = {0};
-    if (!tree.contains(c)) {
-      std::cout << "Thinking...\n";
-      analyze(b);
-      std::cout << "Done Thinking\n";
-      /*
-      md.moves_to_outcome = -1;
-      if (b.move == roboplayer) {
-        std::cout << "Resetting... \n";
-	return play();
+    if (roboplayer > -1) {
+      if (!tree.contains(c)) {
+        std::cout << "Thinking...\n";
+        analyze(b);
+	std::cout << "Done Thinking\n";
       }
-      */
-    }
-    md = tree[c];
+      md = tree[c];
 
-    std::string w = "noone";
-    if (md.outcome == W) {
-      w = "\033[1;43m \033[0m";
-    } else if (md.outcome == B) {
-      w = "\033[1;44m \033[0m";
+      std::string w = "noone";
+      if (md.outcome == W) {
+       w = "\033[1;43m \033[0m";
+      } else if (md.outcome == B) {
+	w = "\033[1;44m \033[0m";
+      }
+      std::cout << "\n[Analysis]: " << w << " is winning in " << static_cast<int>(md.moves_to_outcome) << " moves\n";
     }
-    std::cout << "\n[Analysis]: " << w << " is winning in " << static_cast<int>(md.moves_to_outcome) << " moves\n";
-
-    if (md.moves_to_outcome == 0) {
+    
+    int8_t win = winner(b);
+    if (win == W || win == B) {
+      std::string w;
+      if (win == W) {
+	w = "\033[1;43m \033[0m";
+      } else {
+	w = "\033[1;44m \033[0m";
+      }
       std::cout << "\n\n   " << w << " IS THE WINNER!! CONGRATULATIONS!\n\n";
       std::cout << "   THANKS FOR PLAYING \n\n";
       return play();
@@ -1076,18 +1079,30 @@ void play() {
     std::cout << "\n" << color << "'s move\n";
 
     Move move = b.move == roboplayer ? md.best_move : get_user_move(b);
-    Board b2;
-    if (move.size < -1) {
+    if (move.size == -8) {
+      // Special undo code.
+      if (positions_stack.size() > 1) {
+        positions_stack.pop();
+        encountered_positions.erase(positions_stack.top());
+        // If roboplayer, undo its move also
+        if (roboplayer != -1) {
+	  positions_stack.pop();
+	  encountered_positions.erase(positions_stack.top());
+	}
+      }
+      continue;
+    } else if (move.size == -9) {
       // Special exit code.
+      std::cout << "Exiting...\n";
       return play();
     }
+    Board b2;
     if (!safe_apply_move(b, move, b2)) {
       std::cout << "Illegal move, try again...\n\n";
       continue;
     }
-    encountered_positions[c] = move_count;
-    b = b2;
-    move_count += 1;
+    encountered_positions[c] = positions_stack.size() - 1;
+    positions_stack.push(Compress(b2));
   }
 }
 
