@@ -7,7 +7,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-// clang++ -std=c++20 -O2 main.cc -o bin && ./bin -v
+// g++ -std=c++20 -O2 main.cc -o bin && ./bin 
 
 #define W 0x1
 #define B 0x2
@@ -172,13 +172,18 @@ Board Decompress(CompressedBoard b) {
 struct Move {
   int8_t color = 0;
   int8_t size = -1; // 0 - biggest
-  // Current location of the piece. If -1 this is a new piece
-  int8_t from_i;
-  int8_t from_j;
   // New location of the piece.
   int8_t to_i;
   int8_t to_j;
+  // Current location of the piece. If -1 this is a new piece
+  int8_t from_i;
+  int8_t from_j;
 };
+
+
+Move make_move(int8_t color, int8_t size, int8_t i, int8_t j, int8_t from_i = -1, int8_t from_j = -1) {
+  return {.color = color, .size = size, .to_i = i, .to_j = j, .from_i = from_i, .from_j = from_j};
+}
 
 // returns the biggest size of a piece in the given position. 0 is the biggest. -1 if no piece is placed.
 int biggest_size(int position) {
@@ -368,6 +373,18 @@ bool apply_move(const Board& b, const Move& m, Board& new_b) {
   return is_board_consistent(new_b);
 }
 
+void move(Board& b, int8_t color, int8_t size, int8_t i, int8_t j, int8_t from_i = -1, int8_t from_j = -1) {
+  Move m = make_move(color, size, i, j, from_i, from_j);
+  Board out;
+  bool status = apply_move(b, m, out);
+  #ifdef DEBUG
+  if (!status) {
+    std::cout << "Failed to move";
+  }
+  #endif
+  b = out;
+}
+
 void test_printing() {
   Board b = {0};
   b.positions[0][0] = add_to_position(b.positions[0][0], 0, W);
@@ -397,23 +414,24 @@ Board init_board() {
 
 void test_moves() {
   Board b = init_board();
-  Move m = {.from_i = -1, .from_j = -1, .to_i = 1, .to_j = 1, .size = 1, .color = W};
+  // color, size, i, j, from i, from j
+  Move m = make_move(W, 1, 1, 1);
   Board b2;
   std::cout << apply_move(b, m, b2) << "\n";
   print_board(b2);
 
   b = b2;
-  m = {.from_i = -1, .from_j = -1, .to_i = 1, .to_j = 1, .size = 0, .color = B};
+  m = make_move(B, 0, 1, 1);
   std::cout << apply_move(b, m, b2) << "\n";
   print_board(b2);
 
   b = b2;
-  m = {.from_i = -1, .from_j = -1, .to_i = 2, .to_j = 2, .size = 2, .color = W};
+  m = make_move(W, 2, 2, 2);
   std::cout << apply_move(b, m, b2) << "\n";
   print_board(b2);
 
   b = b2;
-  m = {.from_i = -1, .from_j = -1, .to_i = 2, .to_j = 2, .size = 0, .color = B};
+  m = make_move(B, 0, 2, 2);
   std::cout << apply_move(b, m, b2) << "\n";
   print_board(b2);
   print_board(Decompress(Compress(b2)));
@@ -457,20 +475,12 @@ bool winner(const int e[3][3], int color) {
 
 void test_winning() {
   Board b = init_board();
-  Board b2;
-  Move m = {0};
-  m = {.from_i = -1, .from_j = -1, .to_i = 0, .to_j = 0, .size = 2, .color = W};
-  std::cout << apply_move(b, m, b2) << "\n";
-  m = {.from_i = -1, .from_j = -1, .to_i = 1, .to_j = 1, .size = 0, .color = B};
-  std::cout << apply_move(b2, m, b) << "\n";
-  m = {.from_i = -1, .from_j = -1, .to_i = 0, .to_j = 0, .size = 1, .color = W};
-  std::cout << apply_move(b, m, b2) << "\n";
-  m = {.from_i = -1, .from_j = -1, .to_i = 0, .to_j = 1, .size = 1, .color = B};
-  std::cout << apply_move(b2, m, b) << "\n";
-  m = {.from_i = -1, .from_j = -1, .to_i = 0, .to_j = 0, .size = 0, .color = W};
-  std::cout << apply_move(b, m, b2) << "\n";
-  m = {.from_i = -1, .from_j = -1, .to_i = 2, .to_j = 1, .size = 1, .color = B};
-  std::cout << apply_move(b2, m, b) << "\n";
+  move(b, W, 2, 0, 0);
+  move(b, B, 0, 1, 1);
+  move(b, W, 1, 0, 0);
+  move(b, B, 1, 0, 1);
+  move(b, W, 0, 0, 0);
+  move(b, B, 1, 2, 1);
   print_board(b);
 
   int e[3][3];
@@ -493,8 +503,7 @@ std::vector<Move> next_moves_with_piece(const int positions[3][3], int8_t color,
       if (i == from_i && j == from_j) continue;
       int8_t biggest = biggest_size(positions[i][j]);
       if (biggest == -1 || biggest > size) {
-	Move m = {.size = size, .color = color, .from_i = from_i, .from_j = from_j, .to_i = i, .to_j = j};
-	out.push_back(m);
+	out.push_back(make_move(color, size, i, j, from_i, from_j));
       }
     }
   }
@@ -818,18 +827,6 @@ void analyze(const Board& in) {
   }
 }
 
-void move(Board& b, int8_t color, int8_t size, int8_t i, int8_t j, int8_t from_i = -1, int8_t from_j = -1) {
-  Move m = {.from_i = from_i, .from_j = from_j, .to_i = i, .to_j = j, .size = size, .color = color};
-  Board out;
-  bool status = apply_move(b, m, out);
-  #ifdef DEBUG
-  if (!status) {
-    std::cout << "Failed to move";
-  }
-  #endif
-  b = out;
-}
-
 // Writes board outcomes into a file
 void dump_to_file() {
   std::ofstream file(FILENAME);
@@ -975,7 +972,7 @@ Move get_user_move(const Board& board) {
   choice -= 1;
   to_i = choice / 3;
   to_j = choice % 3;
-  return {.size = size, .color = board.move, .from_i = from_i, .from_j = from_j, .to_i = to_i, .to_j = to_j};
+  return make_move(board.move, size, to_i, to_j, from_i, from_j);
 }
 
 // Applied the given move to the given board to get a new board position.
