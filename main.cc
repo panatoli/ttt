@@ -16,12 +16,7 @@
 #define FILENAME "db.csv"
 #define DUMP_TO_FILE true // Will only dump if the file cannot be found
 
-//#define MOVES_TO_DRAW 32
-//#define LIMIT_TOTAL_MOVES
-
 #define PRINT_TREE_SIZE_RESOLUTION 15
-//#define TREE_SIZE_LIMIT  100000000000
-//#define STACK_SIZE_LIMIT 100000000000
 
 //#define DEBUG
 
@@ -32,9 +27,6 @@ struct Board {
   // counts of available (unplayed yet) pieces, big to small
   int white_pieces[3] = {0};
   int black_pieces[3] = {0};
-  #ifdef LIMIT_TOTAL_MOVES
-  int moves_so_far = 0;
-  #endif
 };
 
 // Returns piece color at given sub-position. 0 - biggest piece
@@ -105,10 +97,6 @@ CompressedBoard Compress(const Board& b) {
 
   out = out * 4 + b.move;
 
-  #ifdef LIMIT_TOTAL_MOVES
-  out = out * 256 + b.moves_so_far;
-  #endif
-
   return out;
 }
 
@@ -117,11 +105,6 @@ Board Decompress(CompressedBoard b) {
   std::map<int, std::vector<std::pair<int, int>>> black_locations;
 
   Board out = {0};
-
-  #ifdef LIMIT_TOTAL_MOVES
-  out.moves_so_far = b % 256;
-  b = b / 256;
-  #endif
 
   out.move = b % 4;
   b = b / 4;
@@ -255,10 +238,6 @@ void print_board(const Board& b) {
   }
   char s2[30];
 
-  #ifdef LIMIT_TOTAL_MOVES
-  sprintf(s2, "\nMoves so far: %d", b.moves_so_far);
-  s += s2;
-  #endif
   s += "\nTo move:";
   s += b.move == W ?  "\033[1;43m \033[0m" : "\033[1;44m \033[0m";
   s += "\n";
@@ -278,11 +257,6 @@ bool is_board_consistent(const Board& b) {
     return false;
   }
 
-  #ifdef LIMIT_TOTAL_MOVES
-  if (b.moves_so_far > MOVES_TO_DRAW) {
-    return false;
-  }
-  #endif
   // count the number of pieces of each color and size, [color][size]
   int piece_count_by_color[3][3] = {0};
   for (int i = 0; i < 3; i++) {
@@ -367,9 +341,6 @@ bool apply_move(const Board& b, const Move& m, Board& new_b) {
   new_b.positions[m.to_i][m.to_j] = add_to_position(to_position, m.size, m.color);
   new_b.move = b.move == W ? B : W;
 
-  #ifdef LIMIT_TOTAL_MOVES
-  new_b.moves_so_far += 1;
-  #endif
   return is_board_consistent(new_b);
 }
 
@@ -678,19 +649,9 @@ void analyze(const Board& in) {
   visited.insert(Compress(in));
   while (!s.empty()) {
     if (tree.size() % (1<<PRINT_TREE_SIZE_RESOLUTION) == 0) {
-      std::cout << "tree.size()    = " << tree.size() << "\n";
-      std::cout << "stack.size()   = " << s.size() << "\n";
-      std::cout << "visited.size() = " << visited.size() << "\n";
-      #ifdef TREE_SIZE_LIMIT
-      if (tree.size() >= TREE_SIZE_LIMIT) {
-        play_known_endings();
-	abort();
-      }
-      if (s.size() >= STACK_SIZE_LIMIT) {
-	unravel_stack(s);
-	abort();
-      }
-      #endif
+      std::cout << "tree.size() = " << tree.size() << "\n";
+      //std::cout << "stack.size()   = " << s.size() << "\n";
+      //std::cout << "visited.size() = " << visited.size() << "\n";
     }
 
     int64_t b_key = s.top();
@@ -699,7 +660,7 @@ void analyze(const Board& in) {
 
     #ifdef DEBUG
     if (tree.contains(b_key)) {
-      // TODO: This is probably wrong. It could be that we encountered this possition downstream
+      // TODO: The message is probably wrong. It could be that we encountered this possition downstream
       // and marked it as a D. Better check that it's a D with 0 moves to outcome
       // (although that too might not be the only case...).
       std::cout << "Did not expect this key in the tree.";
@@ -842,11 +803,13 @@ void dump_to_file() {
     file << v.moves_to_outcome << "\n";
   }
   file.close();
+  std::cout << "\nWrote state to " << FILENAME << "\n"; 
 }
 
 void read_from_file(std::ifstream& file) {
   long count = 0;
   std::string line;
+  std::cout << "Loading...\n";
   while (std::getline(file, line)) {
     if (count % (1 << PRINT_TREE_SIZE_RESOLUTION) == 0) {
       std::cout << "Read " << count << " entries from file\n";
@@ -877,14 +840,13 @@ void read_from_file(std::ifstream& file) {
 
     tree[k] = v;
   }
+  std::cout << "\n";
 }
 
 void min_max() {
-  Board b = init_board();
-  analyze(b);
-
-  // Also analyze for every W first move to learn optimal play as B.
+  // Analyze for every W first move to learn optimal play as B.
   int i = 1;
+  Board b = init_board();
   for (const Move& m: next_moves(b)) {
     std::cout << "After analyzing " << i << " initial positions hash size is: " << tree.size();
     Board new_b;
@@ -894,6 +856,9 @@ void min_max() {
     analyze(new_b);
     i += 1;
   }
+
+  // Finally analyze starting from the initial position.
+  analyze(b);
 
   if (DUMP_TO_FILE) {
     dump_to_file();
