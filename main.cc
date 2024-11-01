@@ -20,9 +20,8 @@
 
 //#define DEBUG
 
-
 struct Board {
-  int positions[3][3] = {0};
+  int positions[3][3] = {{0}};
   int8_t move = 0; // Whose move is that, W/B
   // counts of available (unplayed yet) pieces, big to small
   int white_pieces[3] = {0};
@@ -104,7 +103,7 @@ Board Decompress(CompressedBoard b) {
   std::map<int, std::vector<std::pair<int, int>>> white_locations;
   std::map<int, std::vector<std::pair<int, int>>> black_locations;
 
-  Board out = {0};
+  Board out = {{{0}}};
 
   out.move = b % 4;
   b = b / 4;
@@ -152,6 +151,16 @@ Board Decompress(CompressedBoard b) {
   return out;
 }
 
+std::string color_as_string(int8_t color, std::string default_string = "noone") {
+  if (color == W) {
+    return "\033[1;43m \033[0m";
+  }
+  if (color == B) {
+    return "\033[1;44m \033[0m";
+  }
+  return default_string;
+}
+
 struct Move {
   int8_t color = 0;
   int8_t size = -1; // 0 - biggest
@@ -162,7 +171,6 @@ struct Move {
   int8_t from_i;
   int8_t from_j;
 };
-
 
 Move make_move(int8_t color, int8_t size, int8_t i, int8_t j, int8_t from_i = -1, int8_t from_j = -1) {
   return {.color = color, .size = size, .to_i = i, .to_j = j, .from_i = from_i, .from_j = from_j};
@@ -210,13 +218,7 @@ void print_board(const Board& b) {
 	k = 0;
       }
       int color = sub_pos(position, k);
-      if (color == W) {
-	s += "\033[1;43m \033[0m";
-      } else if (color == B) {
-	s += "\033[1;44m \033[0m";
-      } else {
-	s += " ";
-      }
+      s += color_as_string(color, " ");
     }
     s += "\n";
   }
@@ -224,22 +226,21 @@ void print_board(const Board& b) {
 
   s = "\nAvailable Pieces:\n";
   s += "Color | Big | Medium | Small\n";
-  s += "\033[1;43m \033[0m";
+  s += color_as_string(W);
   for (int i = 0; i < 3; i++) {
     char s2[10];
     sprintf(s2, "       %d", b.white_pieces[i]);
     s += s2;
   }
-  s += "\n\033[1;44m \033[0m";
+  s += color_as_string(B);
   for (int i = 0; i < 3; i++) {
     char s2[10];
     sprintf(s2, "       %d", b.black_pieces[i]);
     s += s2;
   }
-  char s2[30];
 
   s += "\nTo move:";
-  s += b.move == W ?  "\033[1;43m \033[0m" : "\033[1;44m \033[0m";
+  s += color_as_string(b.move);
   s += "\n";
 
   std::cout << s;
@@ -258,7 +259,7 @@ bool is_board_consistent(const Board& b) {
   }
 
   // count the number of pieces of each color and size, [color][size]
-  int piece_count_by_color[3][3] = {0};
+  int piece_count_by_color[3][3] = {{0}};
   for (int i = 0; i < 3; i++) {
     for (int j = 0; j < 3; j++) {
       for (int k = 0; k < 3; k++) {
@@ -348,16 +349,16 @@ void move(Board& b, int8_t color, int8_t size, int8_t i, int8_t j, int8_t from_i
   Move m = make_move(color, size, i, j, from_i, from_j);
   Board out;
   bool status = apply_move(b, m, out);
-  #ifdef DEBUG
   if (!status) {
+    #ifdef DEBUG
     std::cout << "Failed to move";
+    #endif
   }
-  #endif
   b = out;
 }
 
 void test_printing() {
-  Board b = {0};
+  Board b = {{{0}}};
   b.positions[0][0] = add_to_position(b.positions[0][0], 0, W);
   b.positions[0][0] = add_to_position(b.positions[0][0], 1, B);
   b.positions[0][0] = add_to_position(b.positions[0][0], 2, W);
@@ -374,7 +375,7 @@ void test_printing() {
 }
 
 Board init_board() {
-  Board b = {0};
+  Board b = {{{0}}};
   b.move = W;
   for (int i = 0; i < 3; i++) {
     b.white_pieces[i] = 2;
@@ -578,10 +579,9 @@ struct Metadata {
 static std::unordered_map<int64_t, Metadata> tree = {};
 static std::unordered_set<int64_t> visited = {};
 
-void play(const Board& in) {
+void play_optimal_moves(const Board& in) {
   Board b = in;
   std::cout << "\n\n\n\n\n\n\n\n\n\n\n LET THE GAME BEGIN!! \n\n\n\n\n\n\n";
-  int8_t other = 3 - b.move;
   while (1) {
     print_board(b);
     int64_t c = Compress(b);
@@ -594,14 +594,7 @@ void play(const Board& in) {
     Metadata md = tree[c];
     Board b2;
 
-    std::string w = "noone";
-    if (md.outcome == W) {
-      w = "\033[1;43m \033[0m";
-    } else if (md.outcome == B) {
-      w = "\033[1;44m \033[0m";
-    }
-
-    std::cout << w << " is winning in (at most) " << static_cast<int>(md.moves_to_outcome) << " moves\n";
+    std::cout << color_as_string(md.outcome) << " is winning in (at most) " << static_cast<int>(md.moves_to_outcome) << " moves\n";
     if (md.moves_to_outcome > 0) {
       apply_move(b, md.best_move, b2);
       b = b2;
@@ -609,12 +602,6 @@ void play(const Board& in) {
       std::cout << "\n\n   THE END \n\n";
       break;
     }
-  }
-}
-
-void play_known_endings() {
-  for (auto const& [compressed, metadata] : tree) {
-    play(Decompress(compressed));
   }
 }
 
@@ -863,27 +850,6 @@ void min_max() {
   }
 }
 
-
-void from_position() {
-  Board b = init_board();
-  move(b, W, 0, 0, 0);
-  move(b, B, 0 ,0, 1);
-  move(b, W, 2, 1, 2);
-  move(b, B, 1 ,1, 2);
-  move(b, W, 2, 2, 1);
-  move(b, B, 2 ,1, 0);
-  move(b, W, 1, 1, 0);
-  //move(b, B, 1 ,1, 1);
-  //move(b, W, 0, 1, 1);
-  //move(b, B, 2 ,2, 2);
-  //move(b, W, 1, 2, 2);
-  //move(b, B, 0 ,2, 2);
-  std::cout << "Starting from board:\n";
-  print_board(b);
-  analyze(b);
-  play(b);
-}
-
 void play();
 
 Move get_user_move(const Board& board) {
@@ -1038,7 +1004,7 @@ void play() {
       return play();
     }
 
-    Metadata md = {0};
+    Metadata md = {{0}};
     if (roboplayer > -1) {
       if (!tree.contains(c)) {
         std::cout << "Thinking...\n";
@@ -1046,37 +1012,17 @@ void play() {
 	std::cout << "Done Thinking\n";
       }
       md = tree[c];
-
-      std::string w = "noone";
-      if (md.outcome == W) {
-       w = "\033[1;43m \033[0m";
-      } else if (md.outcome == B) {
-	w = "\033[1;44m \033[0m";
-      }
-      std::cout << "\n[Analysis]: " << w << " is winning in " << static_cast<int>(md.moves_to_outcome) << " moves\n";
+      std::cout << "\n[Analysis]: " << color_as_string(md.outcome) << " is winning in " << static_cast<int>(md.moves_to_outcome) << " moves\n";
     }
     
     int8_t win = winner(b);
     if (win == W || win == B) {
-      std::string w;
-      if (win == W) {
-	w = "\033[1;43m \033[0m";
-      } else {
-	w = "\033[1;44m \033[0m";
-      }
-      std::cout << "\n\n   " << w << " IS THE WINNER!! CONGRATULATIONS!\n\n";
+      std::cout << "\n\n   " << color_as_string(win) << " IS THE WINNER!! CONGRATULATIONS!\n\n";
       std::cout << "   THANKS FOR PLAYING \n\n";
       return play();
     }
 
-    std::string color;
-    if (b.move == W) {
-      color  = "\033[1;43m \033[0m";
-    } else if (b.move == B) {
-      color = "\033[1;44m \033[0m";
-    }
-
-    std::cout << "\n" << color << "'s move\n";
+    std::cout << "\n" << color_as_string(b.move) << "'s move\n";
 
     Move move = b.move == roboplayer ? md.best_move : get_user_move(b);
     if (move.size == -8) {
