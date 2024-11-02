@@ -708,15 +708,15 @@ void analyze(const Board& in) {
 	}
       }
     }
-    if (moves_to_win != -1) {
-      s.pop();
-      visited.erase(b_key);
-      continue;
-    }
     if (board_to_push > -1) {
       // We'll get back to current board b after children are analyzed.
       s.push(board_to_push);
       visited.insert(board_to_push);
+      continue;
+    }
+    if (moves_to_win != -1) {
+      s.pop();
+      visited.erase(b_key);
       continue;
     }
 
