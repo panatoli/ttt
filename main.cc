@@ -232,6 +232,7 @@ void print_board(const Board& b) {
     sprintf(s2, "       %d", b.white_pieces[i]);
     s += s2;
   }
+  s += "\n";
   s += color_as_string(B);
   for (int i = 0; i < 3; i++) {
     char s2[10];
@@ -963,6 +964,7 @@ bool safe_apply_move(const Board& b, const Move& m, Board& new_b) {
 void play() {
   int choice;
   int roboplayer = 99;
+  int analysis = 99;
   while (roboplayer == 99) {
     std::cout << "Welcome! Choose an option:\n";
     std::cout << "1. Play \033[1;43mOrange\033[0m (first player to move)\n";
@@ -970,6 +972,7 @@ void play() {
     std::cout << "3. Play For Both Sides\n";
     std::cout << "9. Exit\n";
 
+    int analysis = true;
     std::cin >> choice;
     switch (choice) {
       case 1:
@@ -988,6 +991,24 @@ void play() {
 	break;
     }
   }
+  while (analysis == 99) {
+    std::cout << "Would you like computer analysis?:\n";
+    std::cout << "1. Yes\n";
+    std::cout << "2. No\n";
+
+    std::cin >> choice;
+    switch (choice) {
+      case 1:
+	analysis = 1;
+	break;
+      case 2:
+	analysis = 0;
+	break;
+      default:
+	continue;
+    }
+  }
+
 
   std::cout << "\n\n\n\n\n\n\n\n\n\n\n LET THE GAME BEGIN!! \n\n\n\n\n\n\n";
   std::unordered_map<int64_t, int> encountered_positions;
@@ -1001,18 +1022,20 @@ void play() {
     if (encountered_positions.contains(c)) {
       std::cout << "Position already occured in move: " << encountered_positions[c] << "\n";
       std::cout << "\n\n DRAW BY REPETITION ... THANKS FOR PLAYING\n\n";
+
       return play();
     }
 
     Metadata md = {{0}};
-    if (roboplayer > -1) {
+    if (analysis || roboplayer != -1) {
       if (!tree.contains(c)) {
         std::cout << "Thinking...\n";
         analyze(b);
 	std::cout << "Done Thinking\n";
       }
       md = tree[c];
-      std::cout << "\n[Analysis]: " << color_as_string(md.outcome) << " is winning in " << static_cast<int>(md.moves_to_outcome) << " moves\n";
+      if (analysis == 1)
+        std::cout << "\n[Analysis]: " << color_as_string(md.outcome) << " is winning in " << static_cast<int>(md.moves_to_outcome) << " moves\n";
     }
     
     int8_t win = winner(b);
