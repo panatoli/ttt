@@ -13,8 +13,11 @@
 #define B 0x2
 #define D 0x3
 
-#define FILENAME "db.csv"
+#define FILENAME "full_db.csv"
 #define DUMP_TO_FILE true // Will only dump if the file cannot be found
+
+// The bigger, the more positions will be searched to find shortest wins
+#define ANALYSIS_BRANCHING_FACTOR 2
 
 #define PRINT_TREE_SIZE_RESOLUTION 15
 
@@ -689,11 +692,13 @@ void analyze(const Board& in) {
     // Second pass - look for any winner, or push a board on the stack to go deeper
     int64_t board_to_push = -1;
     int moves_to_win = -1;
+    int unanalyzed_children = 0;
     for (const Move& m: next) {
       Board new_b;
       apply_move(b, m, new_b);
       int64_t new_b_key = Compress(new_b);
       if (!tree.contains(new_b_key)) {
+	unanalyzed_children += 1;
 	if (board_to_push == -1 && !visited.contains(new_b_key)) {
 	  board_to_push = new_b_key;
 	}
@@ -704,11 +709,26 @@ void analyze(const Board& in) {
 	  if (moves_to_win == -1 || n_md.moves_to_outcome < moves_to_win) {
 	    moves_to_win = 1 + n_md.moves_to_outcome;
 	    tree[b_key] = {.best_move = m, .outcome = b.move, .moves_to_outcome = moves_to_win};
+	    if (moves_to_win < 4) {
+	      // There's no win in one after the first pass, so the best we can hope for is win in 3.
+	      break;
+	    }
 	  }
 	}
       }
     }
-    if (board_to_push > -1) {
+    bool continue_search = true;
+    if (board_to_push == -1) {
+      // Everything analyzed
+      continue_search = false;
+    } else if (moves_to_win != -1 && moves_to_win < 4) {
+      // We can't do better than that
+      continue_search = false;
+    } else if (moves_to_win != -1 && unanalyzed_children * ANALYSIS_BRANCHING_FACTOR < next.size()) {
+      // We can maybe do better but enough analyzed
+      continue_search = false;
+    }
+    if (continue_search) {
       // We'll get back to current board b after children are analyzed.
       s.push(board_to_push);
       visited.insert(board_to_push);
@@ -831,16 +851,16 @@ void read_from_file(std::ifstream& file) {
 
 void min_max() {
   // Analyze for every W first move to learn optimal play as B.
-  int i = 1;
+  int i = 0;
   Board b = init_board();
   for (const Move& m: next_moves(b)) {
-    std::cout << "After analyzing " << i << " initial positions hash size is: " << tree.size();
     Board new_b;
     apply_move(b, m, new_b);
     std::cout << "\nAnalyzing starting from:\n";
     print_board(new_b);
     analyze(new_b);
     i += 1;
+    std::cout << "After analyzing " << i << " initial positions hash size is: " << tree.size();
   }
 
   // Finally analyze starting from the initial position.
@@ -972,7 +992,6 @@ void play() {
     std::cout << "3. Play For Both Sides\n";
     std::cout << "9. Exit\n";
 
-    int analysis = true;
     std::cin >> choice;
     switch (choice) {
       case 1:
