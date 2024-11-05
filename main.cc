@@ -16,8 +16,8 @@
 #define FILENAME "full_db.csv"
 #define DUMP_TO_FILE true // Will only dump if the file cannot be found
 
-// The bigger, the more positions will be searched to find shortest wins
-#define ANALYSIS_BRANCHING_FACTOR 2
+// The smaller, the more positions will be searched to find shortest wins. 1 - full search.
+#define ANALYSIS_BRANCHING_FACTOR 25
 
 #define PRINT_TREE_SIZE_RESOLUTION 15
 
@@ -724,7 +724,7 @@ void analyze(const Board& in) {
     } else if (moves_to_win != -1 && moves_to_win < 4) {
       // We can't do better than that
       continue_search = false;
-    } else if (moves_to_win != -1 && unanalyzed_children * ANALYSIS_BRANCHING_FACTOR < next.size()) {
+    } else if (moves_to_win != -1 && unanalyzed_children < ANALYSIS_BRANCHING_FACTOR) {
       // We can maybe do better but enough analyzed
       continue_search = false;
     }
